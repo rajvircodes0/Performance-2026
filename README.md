@@ -1,18 +1,9 @@
-# Performance Dashboard V2
+# Performance Dashboard (Month-wise)
 
-Dark executive-style dashboard inspired by the shared reference screenshot.
+Upload only `index.html` to your GitHub repo root.
 
-## Upload these files to GitHub root
-- index.html
-- styles.css
-- app.js
-- data-inline.js
-
-## Features
-- Overview KPI board
-- By Bank tab
-- By BH tab
-- Staff Directory with search by Tahoe ID / ERP ID / Staff Name
-- Top Performers ranking
-
-No extra data folder is required.
+This version is based on the uploaded dashboard style, but the logic is corrected for month-wise staff status:
+- Jan / Feb / Mar views use that month's actual rows and actual status.
+- Q1 view shows one row per unique staff.
+- In Q1 view, staff status comes from the latest available month for that staff.
+- Staff popup shows month-by-month breakdown so a person appearing in multiple months is not treated as active for all months automatically.
