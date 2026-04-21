@@ -1,315 +1,143 @@
 
-let DATA = [];
-let META = {};
-let charts = {};
+const D = window.__DASHBOARD_DATA__;
+const views = document.querySelectorAll('.view');
+const tabs = document.querySelectorAll('.tab');
+const charts = {};
 
-const els = {
-  search: document.getElementById('globalSearch'),
-  month: document.getElementById('monthFilter'),
-  status: document.getElementById('statusFilter'),
-  designation: document.getElementById('designationFilter'),
-  location: document.getElementById('locationFilter'),
-  product: document.getElementById('productFilter'),
-  clear: document.getElementById('clearFilters'),
-  kpiLibrary: document.getElementById('kpiLibrary'),
-  topCards: document.getElementById('topCards'),
-  resultsTable: document.getElementById('resultsTable'),
-  resultCount: document.getElementById('resultCount'),
-  dataSummary: document.getElementById('dataSummary'),
-  loadError: document.getElementById('loadError'),
-  modal: document.getElementById('staffModal'),
-  staffDetail: document.getElementById('staffDetail'),
-  closeModal: document.getElementById('closeModal'),
-  modalCloseBackdrop: document.getElementById('modalCloseBackdrop'),
-  downloadJson: document.getElementById('downloadJson')
-};
+const fmtNum = v => new Intl.NumberFormat('en-US', {maximumFractionDigits:0}).format(Number(v||0));
+const fmtAED = v => `AED ${new Intl.NumberFormat('en-US', {maximumFractionDigits:1}).format(Number(v||0)/1000000)}M`;
+const fmtAEDFull = v => `AED ${new Intl.NumberFormat('en-US', {maximumFractionDigits:0}).format(Number(v||0))}`;
 
-function fmtNumber(value) {
-  const num = Number(value || 0);
-  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(num);
+tabs.forEach(btn => btn.addEventListener('click', () => {
+  tabs.forEach(t => t.classList.remove('active'));
+  views.forEach(v => v.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+}));
+
+document.getElementById('periodLabel').textContent = `OVERALL KPIS · ${D.meta.period}`;
+
+function card(cls, mini, big, sub, bigClass=''){
+  return `<div class="card ${cls}"><div class="mini">${mini}</div><div class="big ${bigClass}">${big}</div><div class="sub">${sub}</div></div>`;
 }
 
-function fmtCurrency(value) {
-  const num = Number(value || 0);
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'AED',
-    maximumFractionDigits: 0
-  }).format(num);
-}
+document.getElementById('overviewCards').innerHTML = [
+  card('', 'Total Headcount', fmtNum(D.overall.totalHeadcount), 'Unique staff on sheet'),
+  card('green', 'Active Staff', fmtNum(D.overall.activeStaff), 'Currently employed'),
+  card('orange', 'Total CC Bookings', fmtNum(D.overall.totalCC), 'All banks • 3 months'),
+  card('purple', 'Total Loan Bookings', fmtAEDFull(D.overall.totalLoan), `${fmtNum(D.overall.totalLoan)} disbursed`, 'blue'),
+  card('', 'Total Card Revenue', fmtAED(D.overall.totalCardRevenue), 'Card commissions', 'blue'),
+  card('green', 'Total Loan Revenue', fmtAED(D.overall.totalLoanRevenue), 'Loan commissions'),
+  card('orange', 'Total Revenue', fmtAED(D.overall.totalRevenue), 'Cards + Loans + Accounts', 'green'),
+  card('pink', 'Total Cost', fmtAED(D.overall.totalCost), 'Salary + Incentives', 'pink')
+].join('');
 
-function uniqueValues(field) {
-  return [...new Set(DATA.map(r => r[field]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-}
-
-function fillSelect(select, values, label) {
-  select.innerHTML = `<option value="">${label}</option>` + values.map(v => `<option value="${String(v).replaceAll('"','&quot;')}">${v}</option>`).join('');
-}
-
-function groupBy(items, key) {
-  return items.reduce((acc, item) => {
-    const k = item[key] || 'Unknown';
-    acc[k] = acc[k] || [];
-    acc[k].push(item);
-    return acc;
-  }, {});
-}
-
-function sum(items, key) {
-  return items.reduce((t, item) => t + Number(item[key] || 0), 0);
-}
-
-function applyFilters() {
-  const q = els.search.value.trim().toLowerCase();
-  return DATA.filter(row => {
-    const searchMatch = !q || [row['Tahoe id'], row['HRMS ID'], row['Staff Name']]
-      .filter(Boolean)
-      .some(v => String(v).toLowerCase().includes(q));
-
-    const monthMatch = !els.month.value || row['Month'] === els.month.value;
-    const statusMatch = !els.status.value || row['Status'] === els.status.value;
-    const designationMatch = !els.designation.value || row['Designation'] === els.designation.value;
-    const locationMatch = !els.location.value || row['Location'] === els.location.value;
-    const productMatch = !els.product.value || row['Product'] === els.product.value;
-
-    return searchMatch && monthMatch && statusMatch && designationMatch && locationMatch && productMatch;
-  });
-}
-
-function cardTemplate(label, value, note='') {
-  return `
-    <div class="stat-card">
-      <p>${label}</p>
-      <h3>${value}</h3>
-      <small>${note}</small>
-    </div>
-  `;
-}
-
-function renderCards(rows) {
-  const activeCount = rows.filter(r => String(r.Status || '').toLowerCase() === 'active').length;
-  const totalRevenue = sum(rows, 'Total Revenue');
-  const totalCC = sum(rows, 'Total CC');
-  const totalLoan = sum(rows, 'Total Loan');
-  const totalAccounts = sum(rows, 'Total Accounts');
-  const avgRevenue = rows.length ? totalRevenue / rows.length : 0;
-
-  els.topCards.innerHTML = [
-    cardTemplate('Filtered Records', fmtNumber(rows.length), 'Current result set'),
-    cardTemplate('Active Staff', fmtNumber(activeCount), 'Status = Active'),
-    cardTemplate('Total Revenue', fmtCurrency(totalRevenue), 'Sum of Total Revenue'),
-    cardTemplate('Cards / Loans / Accounts', `${fmtNumber(totalCC)} / ${fmtNumber(totalLoan)} / ${fmtNumber(totalAccounts)}`, 'Volume KPIs'),
-    cardTemplate('Avg Revenue / Staff', fmtCurrency(avgRevenue), 'Filtered average')
-  ].join('');
-}
-
-function destroyChart(name) {
-  if (charts[name]) charts[name].destroy();
-}
-
-function buildChart(id, type, data, options = {}) {
-  return new Chart(document.getElementById(id), {
+function mkChart(id, type, data, options={}){
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {
     type,
     data,
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#dfe8ff' } } },
-      scales: {
-        x: { ticks: { color: '#bcd0f3' }, grid: { color: 'rgba(255,255,255,0.06)' } },
-        y: { ticks: { color: '#bcd0f3' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{enabled:true}},
+      scales:{
+        x:{ticks:{color:'#5f7ea8'}, grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{ticks:{color:'#5f7ea8'}, grid:{color:'rgba(255,255,255,0.05)'}}
       },
       ...options
     }
   });
 }
 
-function renderCharts(rows) {
-  const monthly = Object.values(groupBy(rows, 'Month')).map(group => ({
-    month: group[0].Month,
-    revenue: sum(group, 'Total Revenue'),
-    headcount: group.length
-  })).sort((a, b) => String(a.month).localeCompare(String(b.month)));
+const months = D.monthlyTrend.map(x => x.MonthLabel);
+mkChart('ccTrendChart','line',{
+  labels: months,
+  datasets:[{data:D.monthlyTrend.map(x => x['Total CC']), borderColor:'#67b7ff', backgroundColor:'rgba(103,183,255,0.18)', fill:true, tension:.35}]
+});
+mkChart('loanTrendChart','bar',{
+  labels: months,
+  datasets:[{data:D.monthlyTrend.map(x => x['Total Loan']/1000000), backgroundColor:'#ffb84d'}]
+});
 
-  destroyChart('revenueTrend');
-  destroyChart('headcountTrend');
-  destroyChart('designation');
-  destroyChart('topPerformers');
+const sb = document.getElementById('statusBars');
+const maxStatus = Math.max(...D.statusBreakdown.map(x => x.count),1);
+const statusClasses = ['green','pink','orange','purple'];
+sb.innerHTML = D.statusBreakdown.map((x,i)=>`
+  <div class="status-row">
+    <div class="status-label"><span>${x.Status}</span><span>${fmtNum(x.count)}</span></div>
+    <div class="track"><div class="fill ${statusClasses[i%statusClasses.length]}" style="width:${(x.count/maxStatus)*100}%">${fmtNum(x.count)}</div></div>
+  </div>
+`).join('');
 
-  charts.revenueTrend = buildChart('revenueTrendChart', 'line', {
-    labels: monthly.map(m => m.month),
-    datasets: [{ label: 'Total Revenue', data: monthly.map(m => m.revenue), tension: 0.35 }]
-  });
+const loc = document.getElementById('locationSplit');
+loc.className = 'location-grid';
+loc.innerHTML = D.locationSplit.slice(0,4).map((x,i)=>`
+  <div class="location-box">
+    <div class="pct" style="color:${i%2===0?'#67b7ff':'#ffb84d'}">~${x.pct}%</div>
+    <div class="name">${x.location}</div>
+    <div class="cc">${fmtNum(x.cc)} CC</div>
+  </div>
+`).join('');
 
-  charts.headcountTrend = buildChart('headcountTrendChart', 'bar', {
-    labels: monthly.map(m => m.month),
-    datasets: [{ label: 'Headcount', data: monthly.map(m => m.headcount) }]
-  });
+mkChart('bankRevenueChart','bar',{
+  labels:D.byBank.slice(0,10).map(x=>x.bank || 'Unknown'),
+  datasets:[{data:D.byBank.slice(0,10).map(x=>x.revenue), backgroundColor:'#67b7ff'}]
+},{
+  plugins:{legend:{display:false}},
+});
+document.getElementById('bankTable').innerHTML = D.byBank.map(x=>`
+  <tr><td>${x.bank||'-'}</td><td>${fmtNum(x.headcount)}</td><td>${fmtNum(x.cc)}</td><td>${fmtAEDFull(x.loan)}</td><td>${fmtAEDFull(x.revenue)}</td></tr>
+`).join('');
 
-  const designationGroups = Object.entries(groupBy(rows, 'Designation'))
-    .map(([k, v]) => ({ label: k, value: v.length }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 8);
+mkChart('bhRevenueChart','bar',{
+  labels:D.byBH.slice(0,12).map(x=>x.bh || 'Unknown'),
+  datasets:[{data:D.byBH.slice(0,12).map(x=>x.revenue), backgroundColor:'#b191ff'}]
+});
+document.getElementById('bhTable').innerHTML = D.byBH.map(x=>`
+  <tr><td>${x.bh||'-'}</td><td>${fmtNum(x.headcount)}</td><td>${fmtNum(x.cc)}</td><td>${fmtAEDFull(x.loan)}</td><td>${fmtAEDFull(x.revenue)}</td></tr>
+`).join('');
 
-  charts.designation = buildChart('designationChart', 'doughnut', {
-    labels: designationGroups.map(d => d.label),
-    datasets: [{ data: designationGroups.map(d => d.value) }]
-  }, { scales: {} });
-
-  const byPerson = Object.values(groupBy(rows, 'Staff Name')).map(group => ({
-    name: group[0]['Staff Name'],
-    revenue: sum(group, 'Total Revenue'),
-  })).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-
-  charts.topPerformers = buildChart('topPerformersChart', 'bar', {
-    labels: byPerson.map(d => d.name),
-    datasets: [{ label: 'Total Revenue', data: byPerson.map(d => d.revenue) }]
-  }, { indexAxis: 'y' });
-}
-
-function renderTable(rows) {
-  els.resultCount.textContent = `${rows.length} results`;
-  els.resultsTable.innerHTML = rows.slice(0, 300).map((r, idx) => `
-    <tr data-index="${idx}">
-      <td>${r['Month'] || ''}</td>
-      <td>${r['HRMS ID'] || ''}</td>
-      <td>${r['Tahoe id'] || ''}</td>
-      <td>${r['Staff Name'] || ''}</td>
-      <td>${r['Status'] || ''}</td>
-      <td>${r['Designation'] || ''}</td>
-      <td>${r['Location'] || ''}</td>
-      <td>${fmtNumber(r['Total CC'])}</td>
-      <td>${fmtNumber(r['Total Loan'])}</td>
-      <td>${fmtNumber(r['Total Accounts'])}</td>
-      <td>${fmtCurrency(r['Total Revenue'])}</td>
+function renderStaff(rows){
+  document.getElementById('staffTable').innerHTML = rows.slice(0,300).map(x=>`
+    <tr>
+      <td>${x['Staff Name']||'-'}</td>
+      <td>${x['Tahoe id']||'-'}</td>
+      <td>${x['HRMS ID']||'-'}</td>
+      <td>${x['Status']||'-'}</td>
+      <td>${x['Designation']||'-'}</td>
+      <td>${x['Location']||'-'}</td>
+      <td>${x['Bank Code']||'-'}</td>
+      <td>${fmtAEDFull(x['Total Revenue'])}</td>
     </tr>
   `).join('');
-
-  [...els.resultsTable.querySelectorAll('tr')].forEach((tr, idx) => {
-    tr.addEventListener('click', () => openStaffModal(rows[idx]));
-  });
 }
+renderStaff(D.staff);
 
-function renderKpiLibrary() {
-  els.kpiLibrary.innerHTML = META.allKpis.map(k => `<span class="kpi-tag">${k}</span>`).join('');
-}
+document.getElementById('searchInput').addEventListener('input', e=>{
+  const q = e.target.value.trim().toLowerCase();
+  const rows = !q ? D.staff : D.staff.filter(x =>
+    [x['Tahoe id'], x['HRMS ID'], x['Staff Name']].filter(Boolean).some(v => String(v).toLowerCase().includes(q))
+  );
+  renderStaff(rows);
+});
 
-function openStaffModal(row) {
-  const renderList = (keys) => keys.map(k => `<li><span>${k}</span><strong>${typeof row[k] === 'number' ? fmtNumber(row[k]) : (row[k] || 0)}</strong></li>`).join('');
-  els.staffDetail.innerHTML = `
-    <div>
-      <p class="eyebrow">Staff KPI detail</p>
-      <h2 style="margin:0 0 8px">${row['Staff Name'] || 'Unknown Staff'}</h2>
-      <p class="hero-copy">Tahoe ID: ${row['Tahoe id'] || '-'} · ERP / HRMS ID: ${row['HRMS ID'] || '-'} · Month: ${row['Month'] || '-'}</p>
-    </div>
-    <div class="detail-grid">
-      <div class="detail-card">
-        <h4>Profile</h4>
-        <dl class="definition-list">
-          <dt>Status</dt><dd>${row['Status'] || '-'}</dd>
-          <dt>Designation</dt><dd>${row['Designation'] || '-'}</dd>
-          <dt>Location</dt><dd>${row['Location'] || '-'}</dd>
-          <dt>Product</dt><dd>${row['Product'] || '-'}</dd>
-          <dt>Department</dt><dd>${row['Dept'] || '-'}</dd>
-          <dt>DOJ</dt><dd>${row['DOJ'] || '-'}</dd>
-          <dt>DOL</dt><dd>${row['DOL'] || '-'}</dd>
-          <dt>Vintage</dt><dd>${row['Vintage Category'] || '-'}</dd>
-        </dl>
-      </div>
-      <div class="detail-card">
-        <h4>Headline KPIs</h4>
-        <dl class="definition-list">
-          <dt>Total CC</dt><dd>${fmtNumber(row['Total CC'])}</dd>
-          <dt>Total Loan</dt><dd>${fmtNumber(row['Total Loan'])}</dd>
-          <dt>Total Accounts</dt><dd>${fmtNumber(row['Total Accounts'])}</dd>
-          <dt>Total Revenue</dt><dd>${fmtCurrency(row['Total Revenue'])}</dd>
-          <dt>Incentive</dt><dd>${fmtCurrency(row['Incentive'])}</dd>
-          <dt>Paid MOL Salary</dt><dd>${fmtCurrency(row['Paid MOL Salary'])}</dd>
-        </dl>
-      </div>
-    </div>
-    <div class="kpi-columns">
-      <div class="kpi-box">
-        <h4>Compensation KPIs</h4>
-        <ul>${renderList(META.kpiGroups.compensation)}</ul>
-      </div>
-      <div class="kpi-box">
-        <h4>Volume KPIs</h4>
-        <ul>${renderList(META.kpiGroups.volumes)}</ul>
-      </div>
-      <div class="kpi-box">
-        <h4>Revenue KPIs</h4>
-        <ul>${renderList(META.kpiGroups.revenue)}</ul>
-      </div>
-    </div>
-  `;
-  els.modal.classList.remove('hidden');
-}
-
-function closeModal() { els.modal.classList.add('hidden'); }
-
-function downloadFiltered(rows) {
-  const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'filtered-performance-data.json';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function render() {
-  const rows = applyFilters();
-  renderCards(rows);
-  renderCharts(rows);
-  renderTable(rows);
-}
-
-function wireEvents() {
-  [els.search, els.month, els.status, els.designation, els.location, els.product]
-    .forEach(el => el.addEventListener('input', render));
-  els.clear.addEventListener('click', () => {
-    els.search.value = '';
-    els.month.value = '';
-    els.status.value = '';
-    els.designation.value = '';
-    els.location.value = '';
-    els.product.value = '';
-    render();
-  });
-  els.closeModal.addEventListener('click', closeModal);
-  els.modalCloseBackdrop.addEventListener('click', closeModal);
-  els.downloadJson.addEventListener('click', () => downloadFiltered(applyFilters()));
-}
-
-function initializeFromPayload(payload) {
-  DATA = payload.records || [];
-  META = payload.metadata || {};
-  fillSelect(els.month, uniqueValues('Month'), 'All Months');
-  fillSelect(els.status, uniqueValues('Status'), 'All Status');
-  fillSelect(els.designation, uniqueValues('Designation'), 'All Designations');
-  fillSelect(els.location, uniqueValues('Location'), 'All Locations');
-  fillSelect(els.product, uniqueValues('Product'), 'All Products');
-  els.dataSummary.textContent = `Built from ${META.sourceWorkbook}. The dataset contains ${fmtNumber(META.recordCount)} records across ${fmtNumber((META.months || []).length)} monthly periods.`;
-  renderKpiLibrary();
-  wireEvents();
-  render();
-}
-
-async function init() {
-  try {
-    if (window.__DASHBOARD_PAYLOAD__) {
-      initializeFromPayload(window.__DASHBOARD_PAYLOAD__);
-      return;
-    }
-    const res = await fetch('./data/dashboard-data.json');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json();
-    initializeFromPayload(payload);
-  } catch (err) {
-    console.error(err);
-    els.loadError.textContent = 'Data did not load. Re-upload the fixed package files to GitHub and make sure index.html is in the repo root.';
-  }
-}
-
-init();
+mkChart('topPerfChart','bar',{
+  labels:D.topPerformers.slice(0,15).map(x=>x['Staff Name']),
+  datasets:[{data:D.topPerformers.slice(0,15).map(x=>x['Total Revenue']), backgroundColor:'#69d89a'}]
+},{
+  indexAxis:'y'
+});
+document.getElementById('topPerfTable').innerHTML = D.topPerformers.map((x,i)=>`
+  <tr>
+    <td>${i+1}</td>
+    <td>${x['Staff Name']||'-'}</td>
+    <td>${x['Tahoe id']||'-'}</td>
+    <td>${x['HRMS ID']||'-'}</td>
+    <td>${x['Designation']||'-'}</td>
+    <td>${x['Location']||'-'}</td>
+    <td>${fmtNum(x['Total CC'])}</td>
+    <td>${fmtAEDFull(x['Total Loan'])}</td>
+    <td>${fmtAEDFull(x['Total Revenue'])}</td>
+  </tr>
+`).join('');
