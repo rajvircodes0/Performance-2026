@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance KPI Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-badge">KPI</div>
+        <div>
+          <h1>Performance Dashboard</h1>
+          <p>GitHub Pages ready app</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <label for="globalSearch">Search by Tahoe ID / ERP ID / Staff Name</label>
+        <input id="globalSearch" type="text" placeholder="Try: I000003, 29992, Muhammad Adeel" />
+        <p class="helper-text">Search works across Tahoe ID, HRMS/ERP ID, and staff name.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Filters</h3>
+        <div class="filter-grid">
+          <select id="monthFilter"><option value="">All Months</option></select>
+          <select id="statusFilter"><option value="">All Status</option></select>
+          <select id="designationFilter"><option value="">All Designations</option></select>
+          <select id="locationFilter"><option value="">All Locations</option></select>
+          <select id="productFilter"><option value="">All Products</option></select>
+        </div>
+        <button id="clearFilters" class="ghost-btn">Clear filters</button>
+      </div>
+
+      <div class="panel">
+        <h3>KPI Library</h3>
+        <div id="kpiLibrary" class="kpi-library"></div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Staff performance analytics</p>
+          <h2>Searchable KPI dashboard from your performance sheet</h2>
+          <p id="dataSummary" class="hero-copy"></p><p id="loadError" class="hero-copy" style="color:#ffd166;margin-top:8px;"></p>
+        </div>
+        <div class="hero-actions">
+          <button id="downloadJson" class="primary-btn">Download filtered data</button>
+        </div>
+      </section>
+
+      <section class="cards" id="topCards"></section>
+
+      <section class="charts-grid">
+        <div class="chart-card">
+          <div class="card-header">
+            <h3>Monthly revenue trend</h3>
+            <span class="subtle">Total Revenue</span>
+          </div>
+          <canvas id="revenueTrendChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="card-header">
+            <h3>Monthly headcount</h3>
+            <span class="subtle">Records by month</span>
+          </div>
+          <canvas id="headcountTrendChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="card-header">
+            <h3>Designation split</h3>
+            <span class="subtle">Top roles in filtered data</span>
+          </div>
+          <canvas id="designationChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="card-header">
+            <h3>Top performers</h3>
+            <span class="subtle">By Total Revenue</span>
+          </div>
+          <canvas id="topPerformersChart"></canvas>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <div class="table-header">
+          <div>
+            <h3>Staff results</h3>
+            <p>Click any row to inspect full KPI values.</p>
+          </div>
+          <div class="results-meta">
+            <span id="resultCount">0 results</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>ERP / HRMS ID</th>
+                <th>Tahoe ID</th>
+                <th>Staff Name</th>
+                <th>Status</th>
+                <th>Designation</th>
+                <th>Location</th>
+                <th>Total CC</th>
+                <th>Total Loan</th>
+                <th>Total Accounts</th>
+                <th>Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal hidden" id="staffModal">
+    <div class="modal-backdrop" id="modalCloseBackdrop"></div>
+    <div class="modal-panel">
+      <button id="closeModal" class="close-btn">×</button>
+      <div id="staffDetail"></div>
+    </div>
+  </div>
+
+  <script src="data-inline.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
